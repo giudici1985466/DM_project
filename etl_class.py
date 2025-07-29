@@ -62,6 +62,30 @@ class ETLTransformation:
         }
         df = df.rename(columns=rename_map)
         self._write_csv(df, "constructor_standings_staging.csv")
+
+    def drivers_processing(self) -> None:
+        #read the file
+        df = self._read_csv("drivers.csv")
+
+        #remove the unnecessary columns
+        unnecessary_col = ["number", "nationality"]
+        df = df.drop(columns = unnecessary_col)
+
+        #renaming columns
+        rename_map = {
+            "driverId" : "driver_id",
+            "driverRef" : "driver_ref",
+            "code" : "code",
+            "forename" : "forename",
+            "surname" : "surname",
+            "dob" : "dob",
+            "url" : "url"
+        }
+        df = df.rename(columns=rename_map)
+
+        #remove duplicates
+        df = df.drop_duplicates()
+        self._write_csv(df, "drivers_staging.csv")
     
     def weather_processing (self) -> None:
         #read the file weather.csv
