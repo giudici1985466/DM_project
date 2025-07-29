@@ -42,7 +42,7 @@ class ETLTransformation:
         self._write_csv(df, "constructor_results_staging.csv")
     
     def constructor_standings_processing (self) -> None:
-        #read the file constructor_result.csv
+        #read the file constructor_standings.csv
         df = self._read_csv("constructor_standings.csv")
         #remove the unnecessary columns, status
         unnecessary_col = ["positionText"]
