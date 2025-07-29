@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from pathlib import Path
 
 class ETLTransformation:
@@ -39,3 +40,116 @@ class ETLTransformation:
         df = df[correct_order]
         #save the results
         self._write_csv(df, "constructor_results_staging.csv")
+
+    
+    def weather_processing (self) -> None:
+        #read the file weather.csv
+        df = self._read_csv("weather.csv")
+
+
+        df=df.drop_duplicates()
+        
+        #split the field name into two distinct fields and overwrite date
+        df[['date', 'hour']] = df['date'].str.split('T', expand=True)
+
+ 
+        # Replace invalid wind_direction values with NaN
+        df.loc[(df['wind_direction'] < 0) | (df['wind_direction'] > 360), 'wind_direction'] = np.nan
+
+
+        # Replace invalid air_humidity values with NaN
+        df.loc[(df['humidity'] < 0) | (df['humidity'] > 100), 'humidity'] = np.nan
+
+        df['rainfall'] = pd.to_numeric(df['rainfall'], errors='coerce')
+        df.loc[~df['rainfall'].isin([0, 1]), 'rainfall'] = np.nan
+
+
+
+        #reorder the fields according to the order of the DB
+        correct_order = ['date', 'hour', 'session_key', 'meeting_key', 'track_temperature', 'air_temperature', 'wind_direction', 'wind_speed', 'rainfall', 'humidity', 'pressure']
+        df = df[correct_order]
+
+        self._write_csv(df, "weather_staging.csv")
+
+    
+    
+    def status_processing (self) -> None:
+        
+        df=self._read_csv("status.csv")
+
+        df=df.drop_duplicates()
+
+        rename_map={
+            'statusId' : 'status_id'
+        }
+
+        df=df.rename(columns=rename_map)
+
+
+        df['status_id'] = df['status_id'].astype('Int64')  
+        df['status'] = df['status'].astype(str)
+
+
+
+        self._write_csv(df, "status_staging.csv")
+
+    def circuit_processing (self) -> None:
+
+        df=self._read_csv("circuits.csv")
+
+        
+
+        unnecessary_col = ["circuitRef"]
+
+
+        df=df.drop(columns=unnecessary_col)
+
+        df=df.drop_duplicates()
+
+
+
+
+
+        rename_map={
+            'circuitId':'circuit_id'
+
+        }
+        
+        df=df.rename(columns=rename_map)
+
+    
+
+        # Convert to numeric first (in case of strings or mixed types)
+        df['lat'] = pd.to_numeric(df['lat'], errors='coerce')
+        df['lng'] = pd.to_numeric(df['lng'], errors='coerce')
+        df['alt'] = pd.to_numeric(df['alt'], errors='coerce')
+
+        # Replace out-of-range values with NaN
+        df.loc[(df['lat'] < -90) | (df['lat'] > 90), 'lat'] = np.nan
+        df.loc[(df['lng'] < -180) | (df['lng'] > 180), 'lng'] = np.nan
+        df.loc[(df['alt'] < -500) | (df['alt'] > 12000), 'alt'] = np.nan
+
+
+        df['circuit_id'] = df['circuit_id'].astype('Int64')  # Nullable integer
+
+        self._write_csv(df, "circuits_staging.csv")
+
+    def countries_processing(self) -> None:
+
+        df=self._read_csv("countries.csv")
+
+        df=df.drop_duplicates()
+
+        self._write_csv(df, "countries_staging.csv")
+
+
+
+
+
+
+
+
+
+
+       
+
