@@ -86,6 +86,42 @@ class ETLTransformation:
         #remove duplicates
         df = df.drop_duplicates()
         self._write_csv(df, "drivers_staging.csv")
+
+    def race_results_preprocessing(self) -> None:
+        #read the file
+        df = self._read_csv("results.csv")
+
+        #remove unnecessary columns
+        unnecessary_col = ["positionText", "positionOrder", "time","fastestLapSpeed"]
+        df = df.drop(columns = unnecessary_col)
+
+        #rename columns
+        rename_map = {
+            "resultId" : "result_id",
+            "raceId" : "race_id",
+            "driverId" : "driver_id",
+            "constructorId" : "constructor_id",
+            "number" : "num", 
+            "grid" : "grid",
+            "position" : "pos",
+            "points" : "points",
+            "laps" : "laps",
+            "milliseconds" : "milliseconds", 
+            "fastestLap" : "fastest_lap",
+            "rank" : "rank",
+            "fastestLapTime" : "fastest_lap_time",
+            "statusId" : "status_id"
+        }
+        df = df.rename(columns=rename_map)
+
+        #conversions of the column point from float to integer
+        df['points'] = df['points'].round().astype('Int64')
+
+        df["fastest_lap_time"] = df["fastest_lap_time"].apply(_convert_lap_time_to_ms)
+
+        #remove duplicates
+        df = df.drop_duplicates()
+        self._write_csv(df, "race_results_staging.csv")
     
     def weather_processing (self) -> None:
         #read the file weather.csv
