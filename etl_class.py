@@ -40,7 +40,28 @@ class ETLTransformation:
         df = df[correct_order]
         #save the results
         self._write_csv(df, "constructor_results_staging.csv")
-
+    
+    def constructor_standings_processing (self) -> None:
+        #read the file constructor_result.csv
+        df = self._read_csv("constructor_standings.csv")
+        #remove the unnecessary columns, status
+        unnecessary_col = ["positionText"]
+        df = df.drop(columns = unnecessary_col)
+        #check for duplicate
+        df = df.drop_duplicates()
+        #conversions of the column point from float to integer
+        df['points'] = df['points'].round().astype('Int64')
+        #renaming
+        rename_map = {
+            'constructorStandingsId': 'constructors_standings_id',
+            'raceId': 'race_id',
+            'constructorId': 'constructor_id',
+            'points': 'points',
+            'position': 'pos',
+            'wins': 'wins'
+        }
+        df = df.rename(columns=rename_map)
+        self._write_csv(df, "constructor_standings_staging.csv")
     
     def weather_processing (self) -> None:
         #read the file weather.csv
