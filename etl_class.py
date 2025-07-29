@@ -122,6 +122,17 @@ class ETLTransformation:
         #remove duplicates
         df = df.drop_duplicates()
         self._write_csv(df, "race_results_staging.csv")
+
+    def seasons_processing(self) -> None:
+        df = self._read_csv("seasons.csv")
+
+        #don't need to remove columns
+        #remove duplicates
+        df = df.drop_duplicates()
+
+        #don't need rename nor reordering
+
+        self._write_csv(df, "season_staging.csv")
     
     def weather_processing (self) -> None:
         #read the file weather.csv
