@@ -14,3 +14,18 @@ class ETLTransformation:
     def _write_csv(self, df: pd.DataFrame, output_filename: str) -> None:
         #writes a dataframe to a csv in the output directory
         df.to_csv(self.output_dir / output_filename, index=False)
+    
+
+    def constructor_results_processing (self) -> None:
+        #read the file constructor_result.csv
+        df = self._read_csv("constructor_results.csv")
+
+        #remove the unnecessary columns, status
+        unnecessary_col = ["status"]
+        df = df.drop(columns = unnecessary_col)
+        #check for duplicate
+        df = df.drop_duplicates()
+        #conversions of the column point from float to integer
+        df['points'] = df['points'].round().astype('Int64')
+        #save the results
+        self._write_csv(df, "constructor_results_staging.csv")
