@@ -19,7 +19,6 @@ class ETLTransformation:
     def constructor_results_processing (self) -> None:
         #read the file constructor_result.csv
         df = self._read_csv("constructor_results.csv")
-
         #remove the unnecessary columns, status
         unnecessary_col = ["status"]
         df = df.drop(columns = unnecessary_col)
