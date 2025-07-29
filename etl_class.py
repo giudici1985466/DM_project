@@ -14,11 +14,11 @@ class ETLTransformation:
     def _write_csv(self, df: pd.DataFrame, output_filename: str) -> None:
         #writes a dataframe to a csv in the output directory
         df.to_csv(self.output_dir / output_filename, index=False)
-    
 
     def constructor_results_processing (self) -> None:
         #read the file constructor_result.csv
         df = self._read_csv("constructor_results.csv")
+
         #remove the unnecessary columns, status
         unnecessary_col = ["status"]
         df = df.drop(columns = unnecessary_col)
@@ -26,5 +26,16 @@ class ETLTransformation:
         df = df.drop_duplicates()
         #conversions of the column point from float to integer
         df['points'] = df['points'].round().astype('Int64')
+        #columns renaming
+        rename_map = {
+            'constructorResultsId': 'constructors_results_id',
+            'raceId': 'race_id',
+            'constructorId': 'constructor_id',
+            'points': 'points'
+        }
+        df = df.rename(columns=rename_map)
+        #columns reording
+        correct_order = ['constructors_results_id', 'race_id', 'constructor_id', 'points']
+        df = df[correct_order]
         #save the results
         self._write_csv(df, "constructor_results_staging.csv")
