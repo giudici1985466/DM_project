@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from pathlib import Path
+from rapidfuzz import fuzz, process
 
 class ETLTransformation:
     def __init__(self, input_dir: str, output_dir: str):
@@ -233,6 +234,70 @@ class ETLTransformation:
         df=df.drop_duplicates()
 
         self._write_csv(df, "countries_staging.csv")
+
+
+    def races_processing(self) -> None:
+        # Load CSVs
+        df_races = self._read_csv("races.csv")
+        df_meetings = self._read_csv("meetings.csv")
+        
+
+        # Strip not needed columns
+        df_races = df_races[["raceId","year","round","circuitId","name","date","url"]].copy()
+        df_meetings = df_meetings[["meeting_key", "meeting_name", "year"]].copy()
+
+
+        # Clean names
+        df_races['name_clean'] = df_races['name'].str.lower().str.strip()
+        df_meetings['meeting_name_clean'] = df_meetings['meeting_name'].str.lower().str.strip()
+
+
+        # Ensure year columns are integers
+        df_races['year'] = pd.to_numeric(df_races['year'], errors='coerce').astype('Int64')
+        df_meetings['year'] = pd.to_numeric(df_meetings['year'], errors='coerce').astype('Int64')
+
+
+        matched_keys = []
+        THRESHOLD = 85
+
+        for _, race_row in df_races.iterrows():
+            year = race_row['year']
+            race_name_clean = race_row['name_clean']
+            meetings_in_year = df_meetings[df_meetings['year'] == year]
+
+            if not meetings_in_year.empty:
+                best_match = process.extractOne(
+                    race_name_clean,
+                    meetings_in_year['meeting_name_clean'],
+                    scorer=fuzz.token_sort_ratio
+                )
+                if best_match and best_match[1] >= THRESHOLD:
+                    matched_name = best_match[0]
+                    matched_row = meetings_in_year[meetings_in_year['meeting_name_clean'] == matched_name]
+                    meeting_key = matched_row.iloc[0]['meeting_key']
+                    matched_keys.append(meeting_key)
+                else:
+                    matched_keys.append(pd.NA)
+            else:
+                matched_keys.append(pd.NA)
+
+        df_races['matched_meeting_key'] = matched_keys
+        df_races.drop(columns=['name_clean'], inplace=True)
+
+        #rename columns
+        rename_map = {
+            
+            "circuitId" : "circuit_id",
+            "driverId" : "driver_id",
+            
+        }
+
+        df_races = df_races.rename(columns=rename_map)
+
+
+
+
+        self._write_csv(df_races, "races_staging.csv")
 
 
 
