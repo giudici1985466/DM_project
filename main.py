@@ -9,7 +9,18 @@ if __name__ == "__main__":
 
     etl = ETLTransformation(input_dir, output_dir)
 
-    #perform the transformation
+    #transformations
     etl.constructor_results_processing()
     etl.constructor_standings_processing()
-    print("ETL completato con successo.")
+    etl.drivers_processing()
+    etl.race_results_preprocessing()
+    etl.seasons_processing()
+    etl.races_processing()
+    etl.race_lineup_processing()
+    etl.speed_processing()
+    etl.stints_processing()
+    etl.lap_times_processing()
+    etl.pit_stops_processing()
+    etl.qualifying_processing()
+   
+    print("All the staging csv have been created")

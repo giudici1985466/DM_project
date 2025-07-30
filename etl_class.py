@@ -26,10 +26,13 @@ class ETLTransformation:
         #remove the unnecessary columns, status
         unnecessary_col = ["status"]
         df = df.drop(columns = unnecessary_col)
+        
         #check for duplicate
         df = df.drop_duplicates()
+        
         #conversions of the column point from float to integer
         df['points'] = df['points'].round().astype('Int64')
+        
         #columns renaming
         rename_map = {
             'constructorResultsId': 'constructors_results_id',
@@ -38,23 +41,29 @@ class ETLTransformation:
             'points': 'points'
         }
         df = df.rename(columns=rename_map)
+        
         #columns reording
         correct_order = ['constructors_results_id', 'race_id', 'constructor_id', 'points']
         df = df[correct_order]
+        
         #save the results
         self._write_csv(df, "constructor_results_staging.csv")
     
     def constructor_standings_processing (self) -> None:
         #read the file constructor_standings.csv
         df = self._read_csv("constructor_standings.csv")
+        
         #remove the unnecessary columns, status
         unnecessary_col = ["positionText"]
         df = df.drop(columns = unnecessary_col)
+        
         #check for duplicate
         df = df.drop_duplicates()
+        
         #conversions of the column point from float to integer
         df['points'] = df['points'].round().astype('Int64')
-        #renaming
+        
+        #renaming columns
         rename_map = {
             'constructorStandingsId': 'constructors_standings_id',
             'raceId': 'race_id',
@@ -64,6 +73,8 @@ class ETLTransformation:
             'wins': 'wins'
         }
         df = df.rename(columns=rename_map)
+
+        #save the results
         self._write_csv(df, "constructor_standings_staging.csv")
 
     def drivers_processing(self) -> None:
@@ -511,7 +522,7 @@ class ETLTransformation:
         #save the result
         self._write_csv(df, "race_lineup_staging.csv")
         
-def speed_processing(self) -> None:
+    def speed_processing(self) -> None:
         #read the file
         df = self._read_csv("speed_no_avg.csv")
 
@@ -549,7 +560,126 @@ def speed_processing(self) -> None:
         #save the results
         self._write_csv(df, "speed_staging.csv")
 
+    def stints_processing(self) -> None:
+        #read the file
+        df = self._read_csv("stints.csv")
 
+        #remove duplicates
+        df = df.drop_duplicates()
+
+        #remove unnecessary_columns
+        unnecessary_col = ["year"]
+        df = df.drop(columns=unnecessary_col)
+
+        #reading the file races_staging.csv to retrieve the race_id corresponding to the meeting_key
+        races_df = self._read_csv("../output_files/races_staging.csv")
+
+        #remove unnecessary columns
+        races_df = races_df[["race_id", "matched_meeting_key"]]
+
+        #matching between meeting_key and matched_meeting_key
+        df = df.merge(races_df, left_on="meeting_key", right_on="matched_meeting_key", how = "inner")
+
+        #remove unnecessary columns
+        df = df[["driver_number", "race_id", "stint_number", "compound", "lap_start", "lap_end", "session_key", "tyre_age_at_start"]]
+        
+        #converting lap_start and lap_end into integer
+        df['lap_start'] = df['lap_start'].round().astype('Int64')
+        df['lap_end'] = df['lap_end'].round().astype('Int64')
+        #reordering columns
+        correct_order = ["driver_number", "race_id", "stint_number", "compound", "lap_start", "lap_end", "session_key", "tyre_age_at_start"]
+        df = df[correct_order]
+
+        #save the results
+        self._write_csv(df, "stints_staging.csv")
+
+    def lap_times_processing(self) -> None:
+        #read the file
+        df = self._read_csv("lap_times.csv")
+
+        #remove duplicates
+        df = df.drop_duplicates()
+
+        #remove unnecessary columns
+        unnecessary_col = ["time"]
+        df = df.drop(columns=unnecessary_col)
+
+        #renaming columns
+        rename_map = {
+            "raceId" : "race_id",
+            "driverId" :"driver_id",
+            "position" : "pos", 
+            "lap" : "lap_number"
+        }
+        df = df.rename(columns=rename_map)
+
+        #reordering of the columns
+        correct_order = ['race_id', 'driver_id', 'lap_number', 'pos', 'milliseconds']
+        df = df[correct_order]
+
+        #save the results
+        self._write_csv(df, "lap_times_staging.csv")
+        
+    def pit_stops_processing(self) -> None:
+        #read the file
+        df = self._read_csv("pit_stops.csv")
+
+        #remove duplicates
+        df = df.drop_duplicates()
+
+        #remove unnecessary columns
+        unnecessary_col = ["time","duration"]
+        df = df.drop(columns=unnecessary_col)
+
+        #renaming columns
+        rename_map = {
+            "raceId" : "race_id",
+            "driverId" : "driver_id", 
+            "stop" : "stop",
+            "lap" : "lap",
+            "milliseconds" : "milliseconds"
+        }
+        df = df.rename(columns=rename_map)
+
+        #reordering columns
+        correct_order = ['race_id', 'driver_id', 'stop', 'lap', 'milliseconds']
+        df = df[correct_order]
+
+        #save the results
+        self._write_csv(df, "pit_stops_staging.csv")                          
+
+    def qualifying_processing(self) -> None:
+        #read the file
+        df = self._read_csv("qualifying.csv")
+
+        #remove duplicates
+        df = df.drop_duplicates()
+
+        #remove unnecessary columns
+        unnecessary_col = ["number"]
+        df = df.drop(columns=unnecessary_col)
+
+        #renaming columns
+        rename_map = {
+            "qualifyId" : "qualify_id",
+            "raceId" : "race_id",
+            "driverId" : "driver_id", 
+            "constructorId" : "constructor_id",
+            "position": "pos"
+        }
+        df = df.rename(columns=rename_map)
+
+        #reordering columns
+        correct_order = ['qualify_id', 'constructor_id', 'race_id', 'driver_id', 'pos', 'q1', 'q2', 'q3']
+        df = df[correct_order]
+        
+        #conversion  of q1, q2 and q3 into ms
+        df["q1"] = df["q1"].apply(convert_into_ms)
+        df["q2"] = df["q2"].apply(convert_into_ms)
+        df["q3"] = df["q3"].apply(convert_into_ms)
+
+        #save the results
+        self._write_csv(df, "qualifying_staging.csv")
 
 
 
