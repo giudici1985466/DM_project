@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from rapidfuzz import fuzz, process
+from utility import convert_into_ms
 
 class ETLTransformation:
     def __init__(self, input_dir: str, output_dir: str):
@@ -118,7 +119,7 @@ class ETLTransformation:
         #conversions of the column point from float to integer
         df['points'] = df['points'].round().astype('Int64')
 
-        df["fastest_lap_time"] = df["fastest_lap_time"].apply(_convert_lap_time_to_ms)
+        df["fastest_lap_time"] = df["fastest_lap_time"].apply(convert_into_ms)
 
         #remove duplicates
         df = df.drop_duplicates()
@@ -126,42 +127,32 @@ class ETLTransformation:
 
     def seasons_processing(self) -> None:
         df = self._read_csv("seasons.csv")
-
         #don't need to remove columns
         #remove duplicates
         df = df.drop_duplicates()
-
         #don't need rename nor reordering
-
         self._write_csv(df, "season_staging.csv")
     
     def weather_processing (self) -> None:
+        
         #read the file weather.csv
         df = self._read_csv("weather.csv")
-
-
         df=df.drop_duplicates()
         
         #split the field name into two distinct fields and overwrite date
         df[['date', 'hour']] = df['date'].str.split('T', expand=True)
-
- 
+        
         # Replace invalid wind_direction values with NaN
         df.loc[(df['wind_direction'] < 0) | (df['wind_direction'] > 360), 'wind_direction'] = np.nan
-
-
+        
         # Replace invalid air_humidity values with NaN
         df.loc[(df['humidity'] < 0) | (df['humidity'] > 100), 'humidity'] = np.nan
-
         df['rainfall'] = pd.to_numeric(df['rainfall'], errors='coerce')
         df.loc[~df['rainfall'].isin([0, 1]), 'rainfall'] = np.nan
-
-
-
+        
         #reorder the fields according to the order of the DB
         correct_order = ['date', 'hour', 'session_key', 'meeting_key', 'track_temperature', 'air_temperature', 'wind_direction', 'wind_speed', 'rainfall', 'humidity', 'pressure']
         df = df[correct_order]
-
         self._write_csv(df, "weather_staging.csv")
 
     
@@ -169,97 +160,70 @@ class ETLTransformation:
     def status_processing (self) -> None:
         
         df=self._read_csv("status.csv")
-
         df=df.drop_duplicates()
-
+        
         rename_map={
             'statusId' : 'status_id'
         }
-
+        
         df=df.rename(columns=rename_map)
-
-
+        
         df['status_id'] = df['status_id'].astype('Int64')  
         df['status'] = df['status'].astype(str)
-
-
-
+        
         self._write_csv(df, "status_staging.csv")
 
     def circuit_processing (self) -> None:
-
-        df=self._read_csv("circuits.csv")
-
         
-
+        df=self._read_csv("circuits.csv")
         unnecessary_col = ["circuitRef"]
-
-
         df=df.drop(columns=unnecessary_col)
-
         df=df.drop_duplicates()
-
-
-
-
-
+        
         rename_map={
             'circuitId':'circuit_id'
 
         }
         
         df=df.rename(columns=rename_map)
-
-    
-
+        
         # Convert to numeric first (in case of strings or mixed types)
         df['lat'] = pd.to_numeric(df['lat'], errors='coerce')
         df['lng'] = pd.to_numeric(df['lng'], errors='coerce')
         df['alt'] = pd.to_numeric(df['alt'], errors='coerce')
-
+        
         # Replace out-of-range values with NaN
         df.loc[(df['lat'] < -90) | (df['lat'] > 90), 'lat'] = np.nan
         df.loc[(df['lng'] < -180) | (df['lng'] > 180), 'lng'] = np.nan
         df.loc[(df['alt'] < -500) | (df['alt'] > 12000), 'alt'] = np.nan
-
-
         df['circuit_id'] = df['circuit_id'].astype('Int64')  # Nullable integer
-
+        
         self._write_csv(df, "circuits_staging.csv")
 
     def countries_processing(self) -> None:
-
         df=self._read_csv("countries.csv")
-
         df=df.drop_duplicates()
-
         self._write_csv(df, "countries_staging.csv")
-
-
+    
     def races_processing(self) -> None:
+        
         # Load CSVs
         df_races = self._read_csv("races.csv")
         df_meetings = self._read_csv("meetings.csv")
         
-
         # Strip not needed columns
         df_races = df_races[["raceId","year","round","circuitId","name","date","url"]].copy()
         df_meetings = df_meetings[["meeting_key", "meeting_name", "year"]].copy()
-
-
+        
         # Clean names
         df_races['name_clean'] = df_races['name'].str.lower().str.strip()
         df_meetings['meeting_name_clean'] = df_meetings['meeting_name'].str.lower().str.strip()
-
-
+        
         # Ensure year columns are integers
         df_races['year'] = pd.to_numeric(df_races['year'], errors='coerce').astype('Int64')
         df_meetings['year'] = pd.to_numeric(df_meetings['year'], errors='coerce').astype('Int64')
-
-
         matched_keys = []
         THRESHOLD = 85
-
         for _, race_row in df_races.iterrows():
             year = race_row['year']
             race_name_clean = race_row['name_clean']
@@ -280,24 +244,119 @@ class ETLTransformation:
                     matched_keys.append(pd.NA)
             else:
                 matched_keys.append(pd.NA)
-
-        df_races['matched_meeting_key'] = matched_keys
+        df_races['meeting_key'] = matched_keys
         df_races.drop(columns=['name_clean'], inplace=True)
+        
+        #rename columns
+        rename_map = {   
+            "circuitId" : "circuit_id",
+            "driverId" : "driver_id",  
+        }
+        df_races = df_races.rename(columns=rename_map)
+        
+        self._write_csv(df_races, "races_staging.csv")
+
+    def constructors_processing(self)-> None:
+
+        df=self._read_csv("constructors.csv")
+
+        df['constructorId'] = pd.to_numeric(df['constructorId'], errors='coerce').astype('Int64')
+
+
+        unnecessary_col = ["constructorRef","nationality"]
+        df=df.drop(columns=unnecessary_col)
+        
+        df=df.drop_duplicates()
+
+        rename_map = {
+            "constructorId" : "constructor_id"
+        }
+
+        df=df.rename(columns=rename_map)
+
+        self._write_csv(df, "constructors_staging.csv")
+
+    def sessions_processing(self)-> None:
+
+        df=self._read_csv("sessions.csv")
+
+        df['session_key'] = pd.to_numeric(df['session_key'], errors='coerce').astype('Int64')
+        df['meeting_key'] = pd.to_numeric(df['meeting_key'], errors='coerce').astype('Int64')
+
+
+        df= df[["meeting_key", "session_key", "session_type"]].copy()
+        df=df.drop_duplicates()
+
+
+
+
+        self._write_csv(df, "sessions_staging.csv")
+
+
+    def sprint_results_preprocessing(self) -> None:
+        #read the file
+        df = self._read_csv("sprint_results.csv")
+
+        #remove unnecessary columns
+        unnecessary_col = ["positionText", "positionOrder", "time"]
+        df = df.drop(columns = unnecessary_col)
 
         #rename columns
         rename_map = {
-            
-            "circuitId" : "circuit_id",
+            "resultId" : "result_id",
+            "raceId" : "race_id",
             "driverId" : "driver_id",
-            
+            "constructorId" : "constructor_id",
+            "number" : "num", 
+            "grid" : "grid",
+            "position" : "pos",
+            "points" : "points",
+            "laps" : "laps",
+            "milliseconds" : "milliseconds", 
+            "fastestLap" : "fastest_lap",
+            "rank" : "rank",
+            "fastestLapTime" : "fastest_lap_time",
+            "statusId" : "status_id"
         }
+        df = df.rename(columns=rename_map)
 
-        df_races = df_races.rename(columns=rename_map)
+        #conversions of the column point from float to integer
+        df['points'] = df['points'].round().astype('Int64')
+
+        df["fastest_lap_time"] = df["fastest_lap_time"].apply(convert_into_ms)
+
+        #remove duplicates
+        df = df.drop_duplicates()
+        self._write_csv(df, "sprint_results_staging.csv")
 
 
+    def drivers_standings_processing (self) -> None:
+        #read the file constructor_standings.csv
+        df = self._read_csv("driver_standings.csv")
+        #remove the unnecessary columns, status
+        unnecessary_col = ["positionText"]
+        df = df.drop(columns = unnecessary_col)
+        #check for duplicate
+        df = df.drop_duplicates()
+        #conversions of the column point from float to integer
+        df['points'] = df['points'].round().astype('Int64')
+        #renaming
+        rename_map = {
+            'driverStandingsId': 'drivers_standings_id',
+            'raceId': 'race_id',
+            'driverId': 'driver_id',
+            'points': 'points',
+            'position': 'pos',
+            'wins': 'wins'
+        }
+        df = df.rename(columns=rename_map)
+        self._write_csv(df, "drivers_standings_staging.csv")
 
+    def driver_nationality_processing(self) -> None:
+        self
 
-        self._write_csv(df_races, "races_staging.csv")
+    def constructor_nationality_processing(self) -> None:
+        self
 
 
 
