@@ -506,6 +506,34 @@ class ETLTransformation:
 
         #save the results
         self._write_csv(df, "lap_times_staging.csv")
+        
+    def pit_stops_processing(self) -> None:
+        #read the file
+        df = self._read_csv("pit_stops.csv")
+
+        #remove duplicates
+        df = df.drop_duplicates()
+
+        #remove unnecessary columns
+        unnecessary_col = ["time","duration"]
+        df = df.drop(columns=unnecessary_col)
+
+        #renaming columns
+        rename_map = {
+            "raceId" : "race_id",
+            "driverId" : "driver_id", 
+            "stop" : "stop",
+            "lap" : "lap",
+            "milliseconds" : "milliseconds"
+        }
+        df = df.rename(columns=rename_map)
+
+        #reordering columns
+        correct_order = ['race_id', 'driver_id', 'stop', 'lap', 'milliseconds']
+        df = df[correct_order]
+
+        #save the results
+        self._write_csv(df, "pit_stops_staging.csv")                          
 
 
 
