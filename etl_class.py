@@ -409,7 +409,7 @@ class ETLTransformation:
         #save the result
         self._write_csv(df, "race_lineup_staging.csv")
         
-def speed_processing(self) -> None:
+    def speed_processing(self) -> None:
         #read the file
         df = self._read_csv("speed_no_avg.csv")
 
@@ -447,7 +447,7 @@ def speed_processing(self) -> None:
         #save the results
         self._write_csv(df, "speed_staging.csv")
 
-def stints_processing(self) -> None:
+    def stints_processing(self) -> None:
         #read the file
         df = self._read_csv("stints.csv")
 
