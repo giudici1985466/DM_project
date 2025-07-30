@@ -3,6 +3,7 @@ import numpy as np
 from pathlib import Path
 from rapidfuzz import fuzz, process
 from utility import convert_into_ms
+from utility import split_and_clean
 
 class ETLTransformation:
     def __init__(self, input_dir: str, output_dir: str):
@@ -150,9 +151,24 @@ class ETLTransformation:
         df['rainfall'] = pd.to_numeric(df['rainfall'], errors='coerce')
         df.loc[~df['rainfall'].isin([0, 1]), 'rainfall'] = np.nan
         
-        #reorder the fields according to the order of the DB
-        correct_order = ['date', 'hour', 'session_key', 'meeting_key', 'track_temperature', 'air_temperature', 'wind_direction', 'wind_speed', 'rainfall', 'humidity', 'pressure']
+        #Load races_staging.csv to map meeting_key → race_id
+        races = self._read_csv("races_staging.csv")
+
+        # Keep only necessary columns for merging
+        races = races[['race_id', 'meeting_key']]
+
+        # Merge to bring in race_id
+        df = df.merge(races, on='meeting_key', how='inner')
+
+        # Drop meeting_key and reorder
+        df = df.drop(columns=['meeting_key'])
+
+        # Reorder columns for DB
+        correct_order = ['date', 'hour', 'session_key', 'race_id', 'track_temperature', 'air_temperature',
+                        'wind_direction', 'wind_speed', 'rainfall', 'humidity', 'pressure']
         df = df[correct_order]
+
+        # Write result
         self._write_csv(df, "weather_staging.csv")
 
     
@@ -249,6 +265,7 @@ class ETLTransformation:
         
         #rename columns
         rename_map = {   
+            "raceId" : "race_id",
             "circuitId" : "circuit_id",
             "driverId" : "driver_id",  
         }
@@ -285,9 +302,26 @@ class ETLTransformation:
 
 
         df= df[["meeting_key", "session_key", "session_type"]].copy()
+        
+
+        #Load races_staging.csv to map meeting_key → race_id
+        races = self._read_csv("races_staging.csv")
+
+        # Keep only necessary columns for merging
+        races = races[['race_id', 'meeting_key']]
+
+        # Merge to bring in race_id
+        df = df.merge(races, on='meeting_key', how='inner')
+
+        # Drop meeting_key and reorder
+        df = df.drop(columns=['meeting_key'])
+
+        correct_order = ['session_key','race_id','session_type']
+        df = df[correct_order]
+
+
+
         df=df.drop_duplicates()
-
-
 
 
         self._write_csv(df, "sessions_staging.csv")
@@ -353,10 +387,78 @@ class ETLTransformation:
         self._write_csv(df, "drivers_standings_staging.csv")
 
     def driver_nationality_processing(self) -> None:
-        self
+        df_drivers=self._read_csv("drivers.csv")
+        df_countries=self._read_csv("countries.csv")
+
+
+        df_drivers=df_drivers[["driverId","nationality"]].copy()
+        df_countries=df_countries[["nationality"]].copy()
+
+
+        df_countries['nationality_clean'] = df_countries['nationality'].str.lower().str.strip()
+        reference_nationalities = df_countries['nationality_clean'].unique().tolist()
+
+        THRESHOLD = 70                  #tune it to get the matching right
+        matched_rows = []
+
+        for _, row in df_drivers.iterrows():
+            driver_id = row['driverId']
+            nationality_parts = split_and_clean(row['nationality'])
+
+            for nat in nationality_parts:
+                match = process.extractOne(nat, reference_nationalities, scorer=fuzz.token_sort_ratio)
+                if match and match[1] >= THRESHOLD:
+                    # Get original form from countries
+                    original_nat = df_countries[df_countries['nationality_clean'] == match[0]].iloc[0]['nationality']
+                    matched_rows.append({'driverId': driver_id, 'nationality': original_nat})
+
+                    
+        output_df = pd.DataFrame(matched_rows)
+        rename_map={
+            "driverId" : "driver_id"
+        }
+
+        output_df.rename(columns=rename_map)
+        self._write_csv(output_df, "driver_nationality_staging.csv")
+
+
+
+   
 
     def constructor_nationality_processing(self) -> None:
-        self
+        df_constructors=self._read_csv("constructors.csv")
+        df_countries=self._read_csv("countries.csv")
+
+
+        df_constructors=df_constructors[["constructorId","nationality"]].copy()
+        df_countries=df_countries[["nationality"]].copy()
+
+
+        df_countries['nationality_clean'] = df_countries['nationality'].str.lower().str.strip()
+        reference_nationalities = df_countries['nationality_clean'].unique().tolist()
+
+        THRESHOLD = 70                  #tune it to get the matching right
+        matched_rows = []
+
+        for _, row in df_constructors.iterrows():
+            constructor_id = row['constructorId']
+            nationality_parts = split_and_clean(row['nationality'])
+
+            for nat in nationality_parts:
+                match = process.extractOne(nat, reference_nationalities, scorer=fuzz.token_sort_ratio)
+                if match and match[1] >= THRESHOLD:
+                    # Get original form from countries
+                    original_nat = df_countries[df_countries['nationality_clean'] == match[0]].iloc[0]['nationality']
+                    matched_rows.append({'constructorId': constructor_id, 'nationality': original_nat})
+
+                    
+        output_df = pd.DataFrame(matched_rows)
+        rename_map={
+            "constructorId" : "constructor_id"
+        }
+
+        output_df.rename(columns=rename_map)
+        self._write_csv(output_df, "constructor_nationality_staging.csv")
 
     def race_lineup_processing(self) -> None:
         #read the file

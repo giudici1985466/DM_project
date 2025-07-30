@@ -11,3 +11,11 @@ def convert_into_ms(time_str):
             return total_ms
         except:
             return pd.NA 
+        
+
+def split_and_clean(nationality_field):
+    if pd.isna(nationality_field):
+        return []
+    field = str(nationality_field).lower()
+    return [part.strip().lower() for part in str(field).replace("/", "-").split("-")]
+
