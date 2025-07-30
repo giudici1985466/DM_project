@@ -447,6 +447,39 @@ def speed_processing(self) -> None:
         #save the results
         self._write_csv(df, "speed_staging.csv")
 
+def stints_processing(self) -> None:
+        #read the file
+        df = self._read_csv("stints.csv")
+
+        #remove duplicates
+        df = df.drop_duplicates()
+
+        #remove unnecessary_columns
+        unnecessary_col = ["year"]
+        df = df.drop(columns=unnecessary_col)
+
+        #reading the file races_staging.csv to retrieve the race_id corresponding to the meeting_key
+        races_df = self._read_csv("../output_files/races_staging.csv")
+
+        #remove unnecessary columns
+        races_df = races_df[["race_id", "matched_meeting_key"]]
+
+        #matching between meeting_key and matched_meeting_key
+        df = df.merge(races_df, left_on="meeting_key", right_on="matched_meeting_key", how = "inner")
+
+        #remove unnecessary columns
+        df = df[["driver_number", "race_id", "stint_number", "compound", "lap_start", "lap_end", "session_key", "tyre_age_at_start"]]
+        
+        #converting lap_start and lap_end into integer
+        df['lap_start'] = df['lap_start'].round().astype('Int64')
+        df['lap_end'] = df['lap_end'].round().astype('Int64')
+        #reordering columns
+        correct_order = ["driver_number", "race_id", "stint_number", "compound", "lap_start", "lap_end", "session_key", "tyre_age_at_start"]
+        df = df[correct_order]
+
+        #save the results
+        self._write_csv(df, "stints_staging.csv")
+
 
 
 
