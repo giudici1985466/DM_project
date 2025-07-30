@@ -299,7 +299,56 @@ class ETLTransformation:
 
         self._write_csv(df_races, "races_staging.csv")
 
+    def race_lineup_processing(self) -> None:
+        #read the file
+        df = self._read_csv("drivers_openf1.csv")
 
+        #remove the unnecessary columnss
+        unnecessary_col = ["broadcast_name", "country_code", "first_name","full_name", "headshot_url", "last_name", "name_acronym", "session_key", "team_name"]
+        df.drop(columns = unnecessary_col)
+
+        #remove duplicates
+        df = df.drop_duplicates()
+
+        # read races_staging.csv to retrieve the race_id corresponding to the meeting_key
+        races_df = self._read_csv("../output_files/races_staging.csv")
+        
+        #remove unnecessary columns
+        races_df = races_df[["race_id", "matched_meeting_key"]]
+
+        #merge between meeting_key and matched_meeting_key of the two files
+        df = df.merge(races_df, left_on="meeting_key", right_on="matched_meeting_key", how="inner")
+
+        #remove unnecessary columns
+        df = df[["race_id", "driver_number", "team_colour"]]
+
+        #read race_results_staging.cvs in order to obtain dirver_id
+        races_staging_df = self._read_csv("../output_files/race_results_staging.csv")
+
+        #remove unnecessary columns
+        races_staging_df = races_staging_df[["race_id", "driver_id", "num"]]
+
+        #merge between race_id, so that I can access the correct row
+        df = df.merge(races_staging_df, left_on="race_id", right_on="race_id", how = "inner")
+        
+        #remove unnecessary columns
+        df = df[["race_id", "driver_id", "num", "team_colour"]]
+
+        #renaming the columns
+        rename_map = {
+            "meeting_key" : "race_id",
+            "num" : "driver_number",
+            "team_colour" : "team_color",
+            "driver_id" : "driver_id"
+        }
+        df = df.rename(columns = rename_map)
+
+        #columns reording
+        correct_order = ['race_id', 'driver_id', 'driver_number', 'team_color']
+        df = df[correct_order]
+
+        #save the result
+        self._write_csv(df, "race_lineup_staging.csv")
 
 
 
