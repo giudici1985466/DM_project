@@ -25,10 +25,13 @@ class ETLTransformation:
         #remove the unnecessary columns, status
         unnecessary_col = ["status"]
         df = df.drop(columns = unnecessary_col)
+        
         #check for duplicate
         df = df.drop_duplicates()
+        
         #conversions of the column point from float to integer
         df['points'] = df['points'].round().astype('Int64')
+        
         #columns renaming
         rename_map = {
             'constructorResultsId': 'constructors_results_id',
@@ -37,23 +40,29 @@ class ETLTransformation:
             'points': 'points'
         }
         df = df.rename(columns=rename_map)
+        
         #columns reording
         correct_order = ['constructors_results_id', 'race_id', 'constructor_id', 'points']
         df = df[correct_order]
+        
         #save the results
         self._write_csv(df, "constructor_results_staging.csv")
     
     def constructor_standings_processing (self) -> None:
         #read the file constructor_standings.csv
         df = self._read_csv("constructor_standings.csv")
+        
         #remove the unnecessary columns, status
         unnecessary_col = ["positionText"]
         df = df.drop(columns = unnecessary_col)
+        
         #check for duplicate
         df = df.drop_duplicates()
+        
         #conversions of the column point from float to integer
         df['points'] = df['points'].round().astype('Int64')
-        #renaming
+        
+        #renaming columns
         rename_map = {
             'constructorStandingsId': 'constructors_standings_id',
             'raceId': 'race_id',
@@ -63,6 +72,8 @@ class ETLTransformation:
             'wins': 'wins'
         }
         df = df.rename(columns=rename_map)
+
+        #save the results
         self._write_csv(df, "constructor_standings_staging.csv")
 
     def drivers_processing(self) -> None:
@@ -535,7 +546,38 @@ class ETLTransformation:
         #save the results
         self._write_csv(df, "pit_stops_staging.csv")                          
 
+    def qualifying_processing(self) -> None:
+        #read the file
+        df = self._read_csv("qualifying.csv")
 
+        #remove duplicates
+        df = df.drop_duplicates()
+
+        #remove unnecessary columns
+        unnecessary_col = ["number"]
+        df = df.drop(columns=unnecessary_col)
+
+        #renaming columns
+        rename_map = {
+            "qualifyId" : "qualify_id",
+            "raceId" : "race_id",
+            "driverId" : "driver_id", 
+            "constructorId" : "constructor_id",
+            "position": "pos"
+        }
+        df = df.rename(columns=rename_map)
+
+        #reordering columns
+        correct_order = ['qualify_id', 'constructor_id', 'race_id', 'driver_id', 'pos', 'q1', 'q2', 'q3']
+        df = df[correct_order]
+        
+        #conversion  of q1, q2 and q3 into ms
+        df["q1"] = df["q1"].apply(convert_into_ms)
+        df["q2"] = df["q2"].apply(convert_into_ms)
+        df["q3"] = df["q3"].apply(convert_into_ms)
+
+        #save the results
+        self._write_csv(df, "qualifying_staging.csv")
 
 
 
