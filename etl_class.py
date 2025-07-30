@@ -349,6 +349,44 @@ class ETLTransformation:
 
         #save the result
         self._write_csv(df, "race_lineup_staging.csv")
+        
+def speed_processing(self) -> None:
+        #read the file
+        df = self._read_csv("speed_no_avg.csv")
+
+        #remove duplicate
+        df = df.drop_duplicates()
+
+        #remove unnecessary columns
+        unnecessary_col = ["year"]
+        df = df.drop(columns=unnecessary_col)
+    
+        #replacing the meeting_key with the race_id
+        races_df = self._read_csv("../output_files/races_staging.csv")
+        #removing the unnecessary columns
+        races_df = races_df[["race_id", "matched_meeting_key"]]
+
+        #retrieve the race_id corresponding to the meeting_key
+        df = df.merge(races_df, left_on="meeting_key", right_on="matched_meeting_key", how = "inner")
+
+        #remove unnecessary columns
+        df = df[["race_id", "driver_number", "session_key", "lap_number", "st_speed"]]
+
+        #renaming columns
+        rename_map = {
+            "race_id" : "race_id", 
+            "session_key" : "session_key",
+            "lap_number" : "lap_number",
+            "st_speed" : "st_speed"
+        }
+        df = df.rename(columns = rename_map)
+
+        #columns reordering
+        correct_order = ['race_id', 'driver_number', 'session_key', 'lap_number', 'st_speed']
+        df = df[correct_order]
+        
+        #save the results
+        self._write_csv(df, "speed_staging.csv")
 
 
 
