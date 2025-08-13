@@ -479,17 +479,16 @@ class ETLTransformation:
         unnecessary_col = ["broadcast_name", "country_code", "first_name","full_name", "headshot_url", "last_name", "name_acronym", "session_key", "team_name"]
         df.drop(columns = unnecessary_col)
 
-        #remove duplicates
-        df = df.drop_duplicates()
+       
 
         # read races_staging.csv to retrieve the race_id corresponding to the meeting_key
         races_df = self._read_csv("../output_files/races_staging.csv")
         
         #remove unnecessary columns
-        races_df = races_df[["race_id", "matched_meeting_key"]]
+        races_df = races_df[["race_id", "meeting_key"]]
 
-        #merge between meeting_key and matched_meeting_key of the two files
-        df = df.merge(races_df, left_on="meeting_key", right_on="matched_meeting_key", how="inner")
+        #merge between meeting_key and meeting_key of the two files
+        df = df.merge(races_df, left_on="meeting_key", right_on="meeting_key", how="inner")
 
         #remove unnecessary columns
         df = df[["race_id", "driver_number", "team_colour"]]
@@ -500,8 +499,12 @@ class ETLTransformation:
         #remove unnecessary columns
         races_staging_df = races_staging_df[["race_id", "driver_id", "num"]]
 
+        df["driver_number"] = df["driver_number"].astype(int)
+        races_staging_df["num"] = pd.to_numeric(races_staging_df["num"], errors="coerce").astype("Int64")
+        #races_staging_df["num"] = races_staging_df["num"].astype(int)
+        
         #merge between race_id, so that I can access the correct row
-        df = df.merge(races_staging_df, left_on="race_id", right_on="race_id", how = "inner")
+        df = df.merge(races_staging_df, left_on=["race_id", "driver_number"], right_on=["race_id", "num"], how = "inner")
         
         #remove unnecessary columns
         df = df[["race_id", "driver_id", "num", "team_colour"]]
@@ -514,7 +517,8 @@ class ETLTransformation:
             "driver_id" : "driver_id"
         }
         df = df.rename(columns = rename_map)
-
+        #remove duplicates
+        df = df.drop_duplicates(subset=["race_id", "driver_number"], keep="first")
         #columns reording
         correct_order = ['race_id', 'driver_id', 'driver_number', 'team_color']
         df = df[correct_order]
@@ -687,4 +691,5 @@ class ETLTransformation:
 
 
        
+
 
