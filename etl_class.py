@@ -19,7 +19,7 @@ class ETLTransformation:
         #writes a dataframe to a csv in the output directory
         df.to_csv(self.output_dir / output_filename, index=False)
 
-    def constructor_results_processing (self) -> None:
+    def constructors_results_processing (self) -> None:
         #read the file constructor_result.csv
         df = self._read_csv("constructor_results.csv")
 
@@ -47,9 +47,9 @@ class ETLTransformation:
         df = df[correct_order]
         
         #save the results
-        self._write_csv(df, "constructor_results_staging.csv")
+        self._write_csv(df, "constructors_results_staging.csv")
     
-    def constructor_standings_processing (self) -> None:
+    def constructors_standings_processing (self) -> None:
         #read the file constructor_standings.csv
         df = self._read_csv("constructor_standings.csv")
         
@@ -75,7 +75,7 @@ class ETLTransformation:
         df = df.rename(columns=rename_map)
 
         #save the results
-        self._write_csv(df, "constructor_standings_staging.csv")
+        self._write_csv(df, "constructors_standings_staging.csv")
 
     def drivers_processing(self) -> None:
         #read the file
@@ -101,7 +101,7 @@ class ETLTransformation:
         df = df.drop_duplicates()
         self._write_csv(df, "drivers_staging.csv")
 
-    def race_results_preprocessing(self) -> None:
+    def race_results_processing(self) -> None:
         #read the file
         df = self._read_csv("results.csv")
 
@@ -143,7 +143,7 @@ class ETLTransformation:
         #remove duplicates
         df = df.drop_duplicates()
         #don't need rename nor reordering
-        self._write_csv(df, "season_staging.csv")
+        self._write_csv(df, "seasons_staging.csv")
     
     def weather_processing (self) -> None:
         
@@ -151,16 +151,21 @@ class ETLTransformation:
         df = self._read_csv("weather.csv")
         df=df.drop_duplicates()
         
-        #split the field name into two distinct fields and overwrite date
+        # Split into date (YYYY-MM-DD) and time (HH:MM:SS)
         df[['date', 'hour']] = df['date'].str.split('T', expand=True)
-        
+
+
         # Replace invalid wind_direction values with NaN
         df.loc[(df['wind_direction'] < 0) | (df['wind_direction'] > 360), 'wind_direction'] = np.nan
+        df['wind_direction'] = df['wind_direction'].round().astype('Int64')
         
         # Replace invalid air_humidity values with NaN
         df.loc[(df['humidity'] < 0) | (df['humidity'] > 100), 'humidity'] = np.nan
+        df['humidity'] = df['humidity'].round().astype('Int64')
+
         df['rainfall'] = pd.to_numeric(df['rainfall'], errors='coerce')
         df.loc[~df['rainfall'].isin([0, 1]), 'rainfall'] = np.nan
+        df['rainfall'] = df['rainfall'].round().astype('Int64')
         
         #Load races_staging.csv to map meeting_key → race_id
         races = self._read_csv("races_staging.csv")
@@ -218,12 +223,20 @@ class ETLTransformation:
         df['lat'] = pd.to_numeric(df['lat'], errors='coerce')
         df['lng'] = pd.to_numeric(df['lng'], errors='coerce')
         df['alt'] = pd.to_numeric(df['alt'], errors='coerce')
+        df['alt'] = df['alt'].round().astype('Int64')
         
         # Replace out-of-range values with NaN
         df.loc[(df['lat'] < -90) | (df['lat'] > 90), 'lat'] = np.nan
         df.loc[(df['lng'] < -180) | (df['lng'] > 180), 'lng'] = np.nan
         df.loc[(df['alt'] < -500) | (df['alt'] > 12000), 'alt'] = np.nan
         df['circuit_id'] = df['circuit_id'].astype('Int64')  # Nullable integer
+
+        country_map = {
+            'UK': 'United Kingdom',
+            'USA': 'United States',
+            'UAE': 'United Arab Emirates'
+        }
+        df['country'] = df['country'].replace(country_map)
         
         self._write_csv(df, "circuits_staging.csv")
 
@@ -278,7 +291,7 @@ class ETLTransformation:
         rename_map = {   
             "raceId" : "race_id",
             "circuitId" : "circuit_id",
-            "driverId" : "driver_id",  
+            "driverId" : "driver_id"  
         }
         df_races = df_races.rename(columns=rename_map)
         
@@ -312,7 +325,7 @@ class ETLTransformation:
         df['meeting_key'] = pd.to_numeric(df['meeting_key'], errors='coerce').astype('Int64')
 
 
-        df= df[["meeting_key", "session_key", "session_type"]].copy()
+        df= df[["meeting_key", "session_key", "session_name"]].copy()
         
 
         #Load races_staging.csv to map meeting_key → race_id
@@ -322,12 +335,12 @@ class ETLTransformation:
         races = races[['race_id', 'meeting_key']]
 
         # Merge to bring in race_id
-        df = df.merge(races, on='meeting_key', how='inner')
+        df = df.merge(races, on=['meeting_key'], how='inner')
 
         # Drop meeting_key and reorder
         df = df.drop(columns=['meeting_key'])
 
-        correct_order = ['session_key','race_id','session_type']
+        correct_order = ['session_key','race_id','session_name']
         df = df[correct_order]
 
 
@@ -429,7 +442,7 @@ class ETLTransformation:
             "driverId" : "driver_id"
         }
 
-        output_df.rename(columns=rename_map)
+        output_df = output_df.rename(columns=rename_map)
         self._write_csv(output_df, "driver_nationality_staging.csv")
 
 
@@ -468,7 +481,7 @@ class ETLTransformation:
             "constructorId" : "constructor_id"
         }
 
-        output_df.rename(columns=rename_map)
+        output_df = output_df.rename(columns=rename_map)
         self._write_csv(output_df, "constructor_nationality_staging.csv")
 
     def race_lineup_processing(self) -> None:
@@ -479,29 +492,32 @@ class ETLTransformation:
         unnecessary_col = ["broadcast_name", "country_code", "first_name","full_name", "headshot_url", "last_name", "name_acronym", "session_key", "team_name"]
         df.drop(columns = unnecessary_col)
 
-        #remove duplicates
-        df = df.drop_duplicates()
+       
 
         # read races_staging.csv to retrieve the race_id corresponding to the meeting_key
-        races_df = self._read_csv("../output_files/races_staging.csv")
+        races_df = self._read_csv("races_staging.csv")
         
         #remove unnecessary columns
-        races_df = races_df[["race_id", "matched_meeting_key"]]
+        races_df = races_df[["race_id", "meeting_key"]]
 
-        #merge between meeting_key and matched_meeting_key of the two files
-        df = df.merge(races_df, left_on="meeting_key", right_on="matched_meeting_key", how="inner")
+        #merge between meeting_key and meeting_key of the two files
+        df = df.merge(races_df, left_on="meeting_key", right_on="meeting_key", how="inner")
 
         #remove unnecessary columns
         df = df[["race_id", "driver_number", "team_colour"]]
 
         #read race_results_staging.cvs in order to obtain dirver_id
-        races_staging_df = self._read_csv("../output_files/race_results_staging.csv")
+        races_staging_df = self._read_csv("race_results_staging.csv")
 
         #remove unnecessary columns
         races_staging_df = races_staging_df[["race_id", "driver_id", "num"]]
 
+        df["driver_number"] = df["driver_number"].astype(int)
+        races_staging_df["num"] = pd.to_numeric(races_staging_df["num"], errors="coerce").astype("Int64")
+        #races_staging_df["num"] = races_staging_df["num"].astype(int)
+        
         #merge between race_id, so that I can access the correct row
-        df = df.merge(races_staging_df, left_on="race_id", right_on="race_id", how = "inner")
+        df = df.merge(races_staging_df, left_on=["race_id", "driver_number"], right_on=["race_id", "num"], how = "inner")
         
         #remove unnecessary columns
         df = df[["race_id", "driver_id", "num", "team_colour"]]
@@ -514,13 +530,15 @@ class ETLTransformation:
             "driver_id" : "driver_id"
         }
         df = df.rename(columns = rename_map)
-
+        #remove duplicates
+        df = df.drop_duplicates(subset=["race_id", "driver_number"], keep="first")
         #columns reording
         correct_order = ['race_id', 'driver_id', 'driver_number', 'team_color']
         df = df[correct_order]
 
         #save the result
         self._write_csv(df, "race_lineup_staging.csv")
+        
         
     def speed_processing(self) -> None:
         #read the file
@@ -534,12 +552,12 @@ class ETLTransformation:
         df = df.drop(columns=unnecessary_col)
     
         #replacing the meeting_key with the race_id
-        races_df = self._read_csv("../output_files/races_staging.csv")
+        races_df = self._read_csv("races_staging.csv")
         #removing the unnecessary columns
-        races_df = races_df[["race_id", "matched_meeting_key"]]
+        races_df = races_df[["race_id", "meeting_key"]]
 
         #retrieve the race_id corresponding to the meeting_key
-        df = df.merge(races_df, left_on="meeting_key", right_on="matched_meeting_key", how = "inner")
+        df = df.merge(races_df, left_on="meeting_key", right_on="meeting_key", how = "inner")
 
         #remove unnecessary columns
         df = df[["race_id", "driver_number", "session_key", "lap_number", "st_speed"]]
@@ -572,13 +590,13 @@ class ETLTransformation:
         df = df.drop(columns=unnecessary_col)
 
         #reading the file races_staging.csv to retrieve the race_id corresponding to the meeting_key
-        races_df = self._read_csv("../output_files/races_staging.csv")
+        races_df = self._read_csv("races_staging.csv")
 
         #remove unnecessary columns
-        races_df = races_df[["race_id", "matched_meeting_key"]]
+        races_df = races_df[["race_id", "meeting_key"]]
 
-        #matching between meeting_key and matched_meeting_key
-        df = df.merge(races_df, left_on="meeting_key", right_on="matched_meeting_key", how = "inner")
+        #matching between meeting_key and meeting_key
+        df = df.merge(races_df, left_on="meeting_key", right_on="meeting_key", how = "inner")
 
         #remove unnecessary columns
         df = df[["driver_number", "race_id", "stint_number", "compound", "lap_start", "lap_end", "session_key", "tyre_age_at_start"]]
